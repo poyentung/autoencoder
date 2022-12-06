@@ -160,8 +160,8 @@ class VAE(pl.LightningModule):
         epoch_val_kl_loss = torch.stack([x['val_kl_loss'] for x in valid_step_outputs]).mean()
         epoch_val_recon_loss = torch.stack([x['val_recon_loss'] for x in valid_step_outputs]).mean()
         
+        self.log('Epoch_val_loss', epoch_val_loss)
         if type(self.logger) == pl.loggers.TensorBoardLogger:
-            self.logger.experiment.add_scalar('Epoch_val_loss', epoch_val_loss,self.current_epoch)
             self.logger.experiment.add_scalar('Epoch_val_kl_loss', epoch_val_kl_loss,self.current_epoch)
             self.logger.experiment.add_scalar('Epoch_val_recon_loss', epoch_val_recon_loss,self.current_epoch)
 
