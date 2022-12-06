@@ -131,7 +131,11 @@ class DPDataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.n_cpu = n_cpu
         self.cube_root = cube_root
-        self.dataset_full = dataset(path=self.path, cube_root=self.cube_root, random_permutation=self.random_permutation)
+        
+        if type(dataset) == DPDatasetMultiChannel1D:
+            self.dataset_full = dataset(path=self.path, cube_root=self.cube_root, random_permutation=self.random_permutation)
+        else:
+            self.dataset_full = dataset(path=self.path, cube_root=self.cube_root)
 
     def setup(self, stage = None):
         if stage == "fit" or stage is None:

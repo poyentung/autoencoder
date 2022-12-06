@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from typing import Dict, Optional
 from torch import nn
 from torch.nn import functional as F
+from PIL import Image
 from .model import VariationalAutoEncoder
 
 
@@ -21,7 +22,6 @@ class VAE(pl.LightningModule):
                  ):
 
         super().__init__()
-        self.save_hyperparameters()
         self.inplanes = inplanes
         self.model = model(inplanes=self.inplanes)
         
@@ -37,7 +37,10 @@ class VAE(pl.LightningModule):
 
         # latent representation
         self.latent = list()
-    
+        
+        # log hyperparameters
+        self.save_hyperparameters()
+        
     def binary_cross_entropy(self, x_hat, x):
         bin_loss = F.binary_cross_entropy_with_logits(x_hat, x, reduction='none')
         if len(x.size())==4:
@@ -114,11 +117,12 @@ class VAE(pl.LightningModule):
     def training_epoch_end(self, training_step_outputs):
         epoch_train_loss = torch.stack([x['loss'] for x in training_step_outputs]).mean()
         epoch_train_kl_loss = torch.stack([x['train_kl_loss'] for x in training_step_outputs]).mean()
-        epoch_train_recon_loss = -1*torch.stack([x['train_recon_loss'] for x in training_step_outputs]).mean()
-
-        self.logger.experiment.add_scalar('Epoch_train_loss', epoch_train_loss,self.current_epoch)
-        self.logger.experiment.add_scalar('Epoch_train_kl_loss', epoch_train_kl_loss,self.current_epoch)
-        self.logger.experiment.add_scalar('Epoch_train_recon_loss', epoch_train_recon_loss,self.current_epoch)
+        epoch_train_recon_loss = torch.stack([x['train_recon_loss'] for x in training_step_outputs]).mean()
+        
+        if type(self.logger) == pl.loggers.TensorBoardLogger: 
+            self.logger.experiment.add_scalar('Epoch_train_loss', epoch_train_loss,self.current_epoch)
+            self.logger.experiment.add_scalar('Epoch_train_kl_loss', epoch_train_kl_loss,self.current_epoch)
+            self.logger.experiment.add_scalar('Epoch_train_recon_loss', epoch_train_recon_loss,self.current_epoch)
 
     def validation_step(self, val_batch, batch_idx):
         x = val_batch
@@ -139,7 +143,7 @@ class VAE(pl.LightningModule):
         metrics = {
             'val_loss':elbo,
             'val_kl_loss': kl.mean(),
-            'val_recon_loss': -1 * recon_loss.mean(),
+            'val_recon_loss': recon_loss.mean(),
         }
 
         metrics['x']=x
@@ -156,9 +160,10 @@ class VAE(pl.LightningModule):
         epoch_val_kl_loss = torch.stack([x['val_kl_loss'] for x in valid_step_outputs]).mean()
         epoch_val_recon_loss = torch.stack([x['val_recon_loss'] for x in valid_step_outputs]).mean()
         
-        self.log('Epoch_val_loss', epoch_val_loss)
-        self.logger.experiment.add_scalar('Epoch_val_kl_loss', epoch_val_kl_loss,self.current_epoch)
-        self.logger.experiment.add_scalar('Epoch_val_recon_loss', epoch_val_recon_loss,self.current_epoch)
+        if type(self.logger) == pl.loggers.TensorBoardLogger:
+            self.logger.experiment.add_scalar('Epoch_val_loss', epoch_val_loss,self.current_epoch)
+            self.logger.experiment.add_scalar('Epoch_val_kl_loss', epoch_val_kl_loss,self.current_epoch)
+            self.logger.experiment.add_scalar('Epoch_val_recon_loss', epoch_val_recon_loss,self.current_epoch)
 
         # plot validation results
         last_batch = valid_step_outputs[-1]
@@ -167,9 +172,15 @@ class VAE(pl.LightningModule):
 
         # grab the pixel buffer and dump it into a numpy array
         eval_result = np.array(fig.canvas.renderer.buffer_rgba())
-        eval_result = np.moveaxis(eval_result[:,:,:3],2,0)
-        self.logger.experiment.add_image(f'eval_check_{self.current_epoch}', eval_result)
-
+        
+        # for tensorboard
+        if type(self.logger) == pl.loggers.TensorBoardLogger:
+            eval_result = np.moveaxis(eval_result[:,:,:3],2,0)
+            self.logger.experiment.add_image(f'eval_check_{self.current_epoch}', eval_result)
+        elif type(self.logger) == pl.loggers.WandbLogger:
+            eval_result = Image.fromarray(eval_result[:,:,:3])
+            self.logger.log_image(key=f'eval_check_{self.current_epoch}', images=[eval_result])
+    
         # ap_dict = {}
         # for i, c in enumerate(ap_class):
         #     ap_dict[self.class_names[c]] = AP[i]
