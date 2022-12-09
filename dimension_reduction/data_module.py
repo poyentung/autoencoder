@@ -94,19 +94,21 @@ class DPDatasetMultiChannel1D(DPdataset):
                  input_feature_num:int=128, 
                  random_permutation:bool=False
                 ):
-        super().__init__(path, cube_root)
+        super().__init__(path)
         self.input_feature_num = input_feature_num
         self.random_permutation = random_permutation
-        
+        self.cube_root = cube_root
     def __getitem__(self, idx):
         dp = self.seddataset_reshaped[idx][:self.input_feature_num,:] # shape = [147,360]->[128,360]
         dp = np.float32(dp)
         dp = dp / (dp.max())
-        
+        dp = np.cbrt(dp) if self.cube_root else dp
+            
         transform = transforms.Resize(size=(self.input_feature_num,int(dp.shape[-1]/2))) # [128,360]->[128, 180]
         dp = transform(torch.tensor(dp).view(1,1,dp.shape[0],dp.shape[1]))
         
         dp = dp.squeeze().permute(1,0) # now shape = [180,128]
+        
         
         if self.random_permutation:
             return  dp[torch.randperm(dp.shape[0])] # random permutation on axis 0, i.e., 180 [180,128]
@@ -131,8 +133,9 @@ class DPDataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.n_cpu = n_cpu
         self.cube_root = cube_root
+        self.dataset=dataset
         
-        if type(dataset) == DPDatasetMultiChannel1D:
+        if self.dataset == DPDatasetMultiChannel1D:
             self.dataset_full = dataset(path=self.path, cube_root=self.cube_root, random_permutation=self.random_permutation)
         else:
             self.dataset_full = dataset(path=self.path, cube_root=self.cube_root)

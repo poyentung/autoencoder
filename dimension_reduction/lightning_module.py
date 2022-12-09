@@ -26,8 +26,8 @@ class VAE(pl.LightningModule):
         self.model = model(inplanes=self.inplanes)
         
         # for gaussian likelihood
-        self.log_scale = nn.Parameter(torch.Tensor([0.0]))
-        self.log_scale_pe = nn.Parameter(torch.Tensor([0.0]))
+        self.log_scale = nn.Parameter(torch.tensor([0.0]))
+        self.log_scale_pe = nn.Parameter(torch.tensor([0.0]))
         
         # optimizer
         self.optimizer = optimizer
@@ -108,9 +108,9 @@ class VAE(pl.LightningModule):
             'train_recon_loss': recon_loss.mean(),
         }
 
-        self.log('elbo', metrics['loss'], prog_bar=True, on_step=True)
-        self.log('train_kl_loss', metrics['train_kl_loss'], prog_bar=True, on_step=True)
-        self.log('train_recon_loss', metrics['train_recon_loss'], prog_bar=True, on_step=True)
+        self.log('train/train_elbo', metrics['loss'], prog_bar=True, on_step=True)
+        self.log('train/train_kl_loss', metrics['train_kl_loss'], prog_bar=True, on_step=True)
+        self.log('train/train_recon_loss', metrics['train_recon_loss'], prog_bar=True, on_step=True)
 
         return metrics
 
@@ -149,9 +149,9 @@ class VAE(pl.LightningModule):
         metrics['x']=x
         metrics['x_hat']=x_hat
 
-        self.log('val_loss', metrics['val_loss'], prog_bar=True, on_step=True)
-        self.log('val_kl_loss', metrics['val_kl_loss'], prog_bar=True, on_step=True)
-        self.log('val_recon_loss', metrics['val_recon_loss'], prog_bar=True, on_step=True)
+        self.log('val/val_elbo', metrics['val_loss'], prog_bar=True, on_step=True)
+        self.log('val/val_kl_loss', metrics['val_kl_loss'], prog_bar=True, on_step=True)
+        self.log('val/val_recon_loss', metrics['val_recon_loss'], prog_bar=True, on_step=True)
 
         return metrics
     
@@ -172,6 +172,7 @@ class VAE(pl.LightningModule):
 
         # grab the pixel buffer and dump it into a numpy array
         eval_result = np.array(fig.canvas.renderer.buffer_rgba())
+        plt.close()
         
         # for tensorboard
         if type(self.logger) == pl.loggers.TensorBoardLogger:
